@@ -4,12 +4,15 @@
 #include <windows.h>
 #include <stdbool.h>
 
-typedef struct
+typedef struct Win32Window
 {
 	HWND hwnd;
 	HDC hdc;
-	HINSTANCE hInstance;
+	HINSTANCE hinstance;
 	bool should_close;
+	int width;
+	int height;
+
 } Win32Window;
 
 #endif
