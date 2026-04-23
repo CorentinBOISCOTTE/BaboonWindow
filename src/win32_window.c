@@ -5,6 +5,7 @@
 static HINSTANCE g_hinstance = NULL;
 static bool g_initialized = false;
 static const wchar_t* g_class_name = L"BaboonWindowClass";
+static resize_callback g_resize_callback = NULL;
 
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -36,11 +37,13 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
     case WM_SIZE:
         if (window)
         {
-            window->height = LOWORD(lParam);
-            window->width = HIWORD(lParam);
+            int width = LOWORD(lParam);
+            int height = HIWORD(lParam);
+            window->width = width;
+            window->height = height;
 
             if (g_resize_callback)
-                g_resize_callback((BaboonWindow*)window, window->width, window->height);
+                g_resize_callback((BaboonWindow*)window, width, height);
         }
         return 0;
 
@@ -96,6 +99,11 @@ BaboonWindow* create_window(int width, int height, const char* title)
         return NULL;
     }
 
+    RECT rect = { 0, 0, width, height };
+    AdjustWindowRectEx(&rect, WS_OVERLAPPEDWINDOW, FALSE, 0);
+    int window_width = rect.right - rect.left;
+    int window_height = rect.bottom - rect.top;
+
     HWND hwnd = CreateWindowExW(
         0,
         g_class_name,
@@ -103,8 +111,8 @@ BaboonWindow* create_window(int width, int height, const char* title)
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        width,
-        height,
+        window_width,
+        window_height,
         NULL,
         NULL,
         g_hinstance,
@@ -132,9 +140,9 @@ BaboonWindow* create_window(int width, int height, const char* title)
     return (BaboonWindow*)window;
 }
 
-void set_resize_callback(void(*resize_callback)(BaboonWindow*, int, int))
+void set_resize_callback(resize_callback callback)
 {
-    g_resize_callback = resize_callback;
+    g_resize_callback = callback;
 }
 
 void poll_events(void)
