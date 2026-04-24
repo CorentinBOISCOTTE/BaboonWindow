@@ -1,7 +1,7 @@
 #include <stdio.h>
-#include "glad/glad.h"
 #include <baboon/baboon_window.h>
 #include <baboon/baboon_window_vulkan.h>
+#include "renderer.h"
 
 static void size_callback(BaboonWindow *window, int width, int height)
 {
@@ -15,7 +15,7 @@ int main(void)
     if (!window) 
     {
         printf("Failed to create window\n");
-        return 1;
+        return -1;
     }
 
     printf("Window created successfully!\n");
@@ -27,24 +27,24 @@ int main(void)
 
     printf("Width: %d, height: %d\n", width, height);
 
-    make_context_current(window);
+    Renderer *renderer = create_renderer(window);
 
-    if (!gladLoadGLLoader((GLADloadproc)baboon_get_proc_adress))
+    if (!renderer)
     {
-        printf("Failed to initialize GLAD\n");
-        baboon_terminate();
-        return 1;
+        printf("Failed to create renderer\n");
+        return -1;
     }
 
     while (!window_should_close(window)) 
     {
         poll_events();
 
-        glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderer_clear(renderer, 1.0f, 0.0f, 0.0f, 1.0f);
 
-        swap_buffers(window);
+        renderer_present(renderer, window);
     }
+
+    destroy_renderer(renderer);
 
     printf("Closing window...\n");
 

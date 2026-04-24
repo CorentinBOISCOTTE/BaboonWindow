@@ -5,8 +5,6 @@
 # Define minimum CMake version required
 cmake_minimum_required(VERSION 3.29.0)
 
-
-
 project(Window VERSION 1.0.0 LANGUAGES C)
 
 
@@ -14,7 +12,23 @@ project(Window VERSION 1.0.0 LANGUAGES C)
 #            BUILD MODE                 #
 #---------------------------------------#
 
-add_executable(BaboonWindow_TEST "main.c" "glad/src/glad.c")
+option(TEST_OPENGL "Use OpenGL renderer" OFF)
+option(TEST_VULKAN "Use Vulkan renderer" OFF)
+option(TEST_D3D12 "Use D3D12 renderer" ON)
+
+if(TEST_OPENGL)
+    list(APPEND BaboonWindow_TEST_SOURCES "glad/src/glad.c" "opengl_renderer.c")
+elseif(TEST_VULKAN AND BABOON_VULKAN)
+    list(APPEND BaboonWindow_TEST_SOURCES "vulkan_renderer.c")
+elseif(TEST_D3D12 AND WIN32)
+    list(APPEND BaboonWindow_TEST_SOURCES "d3d12_renderer.c")
+else()
+    message(FATAL_ERROR "No rendering API specified")
+endif()
+
+list(APPEND BaboonWindow_TEST_SOURCES "main.c")
+
+add_executable(BaboonWindow_TEST ${BaboonWindow_TEST_SOURCES})
 
 
 
@@ -39,5 +53,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 target_link_libraries(BaboonWindow_TEST PRIVATE BaboonWindow)
+
+if(WIN32)
+target_link_libraries(BaboonWindow_TEST PRIVATE d3d12 dxgi)
+endif()
 
 target_include_directories(BaboonWindow_TEST PRIVATE "glad/include")
