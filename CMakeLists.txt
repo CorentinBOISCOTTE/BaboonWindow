@@ -13,21 +13,32 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${OUTPUT_DIR_BASE}/$<CONFIG>")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${OUTPUT_DIR_BASE}/$<CONFIG>")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${OUTPUT_DIR_BASE}/$<CONFIG>")
 
-#---------------------------------------#
-#			SOURCES					#
-#---------------------------------------#
-file(GLOB_RECURSE BaboonWindow_SOURCES "src/*.c")
+option(BABOON_VULKAN "Link vulkan" ON)
 
-# Platform-specific sources
-if(WIN32)
-    list(APPEND BaboonWindow_SOURCES "src/win32_window.c")
-elseif(UNIX AND NOT APPLE)
-    # Linux support coming later
-    message(STATUS "Linux support not yet implemented")
+if (BABOON_VULKAN)
+    find_package(Vulkan REQUIRED)
 endif()
 
 #---------------------------------------#
-#			BUILD MODE  			#
+#			SOURCES					    #
+#---------------------------------------#
+#file(GLOB_RECURSE BaboonWindow_SOURCES "src/baboon/*.c")
+
+# Platform-specific sources
+if(WIN32)
+    list(APPEND BaboonWindow_SOURCES "src/baboon_win32/win32_window.c")
+elseif(UNIX AND NOT APPLE)
+    # Linux support coming later
+    message(STATUS "Linux support not yet implemented")
+    list(APPEND BaboonWindow_SOURCES "src/baboon_linux/linux_window.c")
+endif()
+
+if (BABOON_VULKAN)
+    list(APPEND BaboonWindow_SOURCES "src/baboon_vulkan/baboon_window_vulkan.c")
+endif()
+
+#---------------------------------------#
+#			BUILD MODE  			    #
 #---------------------------------------#
 option(BaboonWindow_BUILD_STATIC "Build static libraries" ON)
 
@@ -60,10 +71,17 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Disable C compiler extensions
 set(CMAKE_C_EXTENSIONS OFF)
 
+if (BABOON_VULKAN)
+    target_compile_definitions(BaboonWindow PUBLIC BABOON_VULKAN)
+    target_link_libraries(BaboonWindow PUBLIC Vulkan::Vulkan)
+endif()
+
 # Link Windows libraries
 if(WIN32)
     target_link_libraries(BaboonWindow PUBLIC user32 gdi32)
 endif()
+
+target_link_libraries(BaboonWindow PUBLIC opengl32)
 
 #---------------------------------------#
 #        EXPORTS / IMPORTS FOR LIB      #

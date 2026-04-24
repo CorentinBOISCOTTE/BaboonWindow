@@ -4,6 +4,11 @@
 #include <windows.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 typedef struct Win32Window
 {
 	HWND hwnd;
@@ -15,4 +20,7 @@ typedef struct Win32Window
 
 } Win32Window;
 
+#ifdef __cplusplus
+}
+#endif
 #endif
