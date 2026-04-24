@@ -10,12 +10,11 @@ cmake_minimum_required(VERSION 3.29.0)
 project(Window VERSION 1.0.0 LANGUAGES C)
 
 
-
 #---------------------------------------#
 #            BUILD MODE                 #
 #---------------------------------------#
 
-add_executable(BaboonWindow_TEST "main.c")
+add_executable(BaboonWindow_TEST "main.c" "glad/src/glad.c")
 
 
 
@@ -40,3 +39,5 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 target_link_libraries(BaboonWindow_TEST PRIVATE BaboonWindow)
+
+target_include_directories(BaboonWindow_TEST PRIVATE "glad/include")
