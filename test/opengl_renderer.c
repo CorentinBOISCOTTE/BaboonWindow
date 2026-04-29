@@ -7,7 +7,7 @@ Renderer* create_renderer(BaboonWindow *window)
 {
     make_context_current(window);
 
-    if (!gladLoadGLLoader((GLADloadproc)baboon_get_proc_adress))
+    if (!gladLoadGLLoader((GLADloadproc)baboon_get_proc_address))
     {
         printf("Failed to initialize GLAD\n");
         baboon_terminate();

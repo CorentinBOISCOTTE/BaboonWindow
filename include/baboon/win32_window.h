@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <stdbool.h>
 
+#include "baboon_internal.h"
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -11,12 +13,11 @@ extern "C"
 
 typedef struct Win32Window
 {
+	_BaboonWindow* internal_window;
+
 	HWND hwnd;
 	HDC hdc;
 	HINSTANCE hinstance;
-	bool should_close;
-	int width;
-	int height;
 
 } Win32Window;
 

@@ -12,9 +12,9 @@ project(Window VERSION 1.0.0 LANGUAGES C)
 #            BUILD MODE                 #
 #---------------------------------------#
 
-option(TEST_OPENGL "Use OpenGL renderer" OFF)
+option(TEST_OPENGL "Use OpenGL renderer" ON)
 option(TEST_VULKAN "Use Vulkan renderer" OFF)
-option(TEST_D3D12 "Use D3D12 renderer" ON)
+option(TEST_D3D12 "Use D3D12 renderer" OFF)
 
 if(TEST_OPENGL)
     list(APPEND BaboonWindow_TEST_SOURCES "glad/src/glad.c" "opengl_renderer.c")

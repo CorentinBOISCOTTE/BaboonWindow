@@ -7,7 +7,6 @@
 static HINSTANCE g_hinstance = NULL;
 static bool g_initialized = false;
 static const wchar_t *g_class_name = L"BaboonWindowClass";
-static resize_callback g_resize_callback = NULL;
 static HGLRC g_gl_context = NULL;
 
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -31,22 +30,136 @@ static bool register_window_class(void)
     return RegisterClassW(&wnd_class) != 0;
 }
 
+static int get_mods(void)
+{
+    int mods = 0;
+
+    if (GetKeyState(VK_CONTROL) & 0x8000)
+        mods |= BABOON_MOD_CONTROL;
+    if (GetKeyState(VK_SHIFT) & 0x8000)
+        mods |= BABOON_MOD_SHIFT;
+    if (GetKeyState(VK_MENU) & 0x8000)
+        mods |= BABOON_MOD_ALT;
+    if (GetKeyState(VK_CAPITAL) & 1)
+        mods |= BABOON_MOD_CAPS_LOCK;
+    if (GetKeyState(VK_NUMLOCK) & 1)
+        mods |= BABOON_MOD_NUM_LOCK;
+    if ((GetKeyState(VK_LWIN) | GetKeyState(VK_RWIN)) & 0x8000)
+        mods |= BABOON_MOD_SUPER;
+
+    return mods;
+}
+
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     Win32Window *window = (Win32Window*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 
     switch (uMsg)
     {
+    case WM_LBUTTONDOWN:
+    case WM_RBUTTONDOWN:
+    case WM_MBUTTONDOWN:
+    case WM_XBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_RBUTTONUP:
+    case WM_MBUTTONUP:
+    case WM_XBUTTONUP:
+    {
+        int i, button, action;
+
+        if (uMsg == WM_LBUTTONDOWN || uMsg == WM_LBUTTONUP)
+            button = BABOON_MB_LEFT;
+        else if (uMsg == WM_RBUTTONDOWN || uMsg == WM_RBUTTONUP)
+            button = BABOON_MB_RIGHT;
+        else if (uMsg == WM_MBUTTONDOWN || uMsg == WM_MBUTTONUP)
+            button = BABOON_MB_MIDDLE;
+        else if (GET_XBUTTON_WPARAM(wParam) == XBUTTON1)
+            button = BABOON_MB_4;
+        else
+            button = BABOON_MB_5;
+
+        if (uMsg == WM_LBUTTONDOWN || uMsg == WM_RBUTTONDOWN || uMsg == WM_MBUTTONDOWN || uMsg == WM_XBUTTONDOWN)
+            action = BABOON_PRESS;
+        else
+            action = BABOON_RELEASE;
+
+        for (i = 0; i <= BABOON_MB_LAST; ++i)
+        {
+            if (window->internal_window->mouse_buttons[i] == BABOON_PRESS)
+                break;
+        }
+
+        if (i > BABOON_MB_LAST)
+            SetCapture(hwnd);
+
+        baboon_input_mouse_click(window->internal_window, (void*)window, button, action, get_mods());
+
+        for (i = 0; i <= BABOON_MB_LAST; ++i)
+        {
+            if (window->internal_window->mouse_buttons[i] == BABOON_PRESS)
+                break;
+        }
+
+        if (i > BABOON_MB_LAST)
+            ReleaseCapture();
+
+        if (uMsg == WM_XBUTTONDOWN || uMsg == WM_XBUTTONUP)
+            return TRUE;
+
+        return 0;
+    }
+
+    case WM_MOUSEMOVE:
+    {
+        const int x = GET_X_LPARAM(lParam);
+        const int y = GET_Y_LPARAM(lParam);
+
+        if (!window->internal_window->cursor_tracked)
+        {
+            TRACKMOUSEEVENT tme;
+            ZeroMemory(&tme, sizeof(tme));
+            tme.cbSize = sizeof(tme);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = window->hwnd;
+            TrackMouseEvent(&tme);
+
+            window->internal_window->cursor_tracked = true;
+            baboon_input_mouse_enter(window->internal_window, (void*)window, true);
+        }
+
+        if (window->internal_window->cursor_mode == BABOON_CURSOR_DISABLED)
+        {
+            const int dx = x - window->internal_window->last_x_pos;
+            const int dy = y - window->internal_window->last_y_pos;
+
+            baboon_input_mouse_pos(window->internal_window, (void*)window, window->internal_window->virtual_x_pos + dx, window->internal_window->virtual_y_pos + dy);
+        }
+        else
+            baboon_input_mouse_pos(window->internal_window, (void*)window, x, y);
+
+        window->internal_window->last_x_pos = (double)x;
+        window->internal_window->last_y_pos = (double)y;
+
+        return 0;
+    }
+
+    case WM_MOUSELEAVE:
+    {
+        window->internal_window->cursor_tracked = false;
+        baboon_input_mouse_enter(window->internal_window, (void*)window, false);
+        return 0;
+    }
+
     case WM_SIZE:
         if (window)
         {
             int width = LOWORD(lParam);
             int height = HIWORD(lParam);
-            window->width = width;
-            window->height = height;
+            window->internal_window->width = width;
+            window->internal_window->height = height;
 
-            if (g_resize_callback)
-                g_resize_callback((BaboonWindow*)window, width, height);
+            if (window->internal_window->callbacks.resize)
+                window->internal_window->callbacks.resize((BaboonWindow*)window, width, height);
         }
         return 0;
 
@@ -54,7 +167,7 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
         if (window)
         {
             DestroyWindow(hwnd);
-            window->should_close = true;
+            window->internal_window->should_close = true;
         }
         return 0;
 
@@ -91,6 +204,8 @@ BaboonWindow* create_window(int width, int height, const char *title)
     Win32Window *window = (Win32Window*)malloc(sizeof(Win32Window));
     if (!window)
         return NULL;
+
+    window->internal_window = initialize_internal_window();
 
     size_t new_size = strlen(title) + 1;
     wchar_t *w_title = (wchar_t*)malloc(new_size * sizeof(wchar_t));
@@ -132,9 +247,9 @@ BaboonWindow* create_window(int width, int height, const char *title)
     window->hwnd = hwnd;
     window->hinstance = g_hinstance;
     window->hdc = GetDC(hwnd);
-    window->width = width;
-    window->height = height;
-    window->should_close = false;
+    window->internal_window->width = width;
+    window->internal_window->height = height;
+    window->internal_window->should_close = false;
 
     SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)window);
     ShowWindow(hwnd, SW_SHOW);
@@ -143,9 +258,72 @@ BaboonWindow* create_window(int width, int height, const char *title)
     return (BaboonWindow*)window;
 }
 
-void set_resize_callback(resize_callback callback)
+void set_resize_callback(BaboonWindow *window, baboon_resize_callback callback)
 {
-    g_resize_callback = callback;
+    if (!window || !callback)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    win32_window->internal_window->callbacks.resize = callback;
+}
+
+void set_mouse_click_callback(BaboonWindow *window, baboon_mb_callback callback)
+{
+    if (!window || !callback)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    win32_window->internal_window->callbacks.mouse_button = callback;
+}
+
+void set_mouse_pos_callback(BaboonWindow *window, baboon_mouse_pos_callback callback)
+{
+    if (!window || !callback)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    win32_window->internal_window->callbacks.mouse_pos = callback;
+}
+
+void set_mouse_enter_callback(BaboonWindow *window, baboon_mouse_enter_callback callback)
+{
+    if (!window || !callback)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    win32_window->internal_window->callbacks.mouse_enter = callback;
+}
+
+int get_mouse_button(BaboonWindow *window, int button)
+{
+    if (!window || button < 0 || button > BABOON_MB_LAST)
+        return BABOON_NONE;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    return win32_window->internal_window->mouse_buttons[button];
+}
+
+void get_cursor_pos(BaboonWindow *window, double *x_pos, double *y_pos)
+{
+    if (!window || !x_pos || !y_pos)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+
+    POINT cursor_pos;
+
+    if (GetCursorPos(&cursor_pos))
+    {
+        ScreenToClient(win32_window->hwnd, &cursor_pos);
+
+        *x_pos = cursor_pos.x;
+        *y_pos = cursor_pos.y;
+    }
 }
 
 void poll_events(void)
@@ -158,6 +336,16 @@ void poll_events(void)
     }
 }
 
+void wait_events(void)
+{
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0) > 0)
+    {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+}
+
 void get_window_size(BaboonWindow *window, int *width, int *height)
 {
     if (!window || !width || !height)
@@ -165,8 +353,8 @@ void get_window_size(BaboonWindow *window, int *width, int *height)
 
     Win32Window *win32_window = (Win32Window*)window;
 
-    *width = win32_window->width;
-    *height = win32_window->height;
+    *width = win32_window->internal_window->width;
+    *height = win32_window->internal_window->height;
 }
 
 bool window_should_close(BaboonWindow *window)
@@ -175,7 +363,16 @@ bool window_should_close(BaboonWindow *window)
         return true;
     
     Win32Window *win32_window = (Win32Window*)window;
-    return win32_window->should_close;
+    return win32_window->internal_window->should_close;
+}
+
+void set_window_should_close(BaboonWindow* window, bool should_close)
+{
+    if (!window)
+        return;
+
+    Win32Window* win32_window = (Win32Window*)window;
+    win32_window->internal_window->should_close = should_close;
 }
 
 void destroy_window(BaboonWindow *window)
@@ -195,6 +392,7 @@ void destroy_window(BaboonWindow *window)
         DestroyWindow(win32_window->hwnd);
     }
 
+    free(win32_window->internal_window);
     free(win32_window);
 }
 
@@ -240,18 +438,18 @@ void baboon_terminate(void)
     }
 }
 
-GLProc baboon_get_proc_adress(const char *proc_name)
+gl_proc baboon_get_proc_address(const char *proc_name)
 {
     if (!proc_name)
         return NULL;
 
-    GLProc proc = (GLProc)wglGetProcAddress(proc_name);
+    gl_proc proc = (gl_proc)wglGetProcAddress(proc_name);
 
     if (!proc)
     {
         HMODULE opengl_module = GetModuleHandleA("opengl32.dll");
         if (opengl_module)
-            proc = (GLProc)GetProcAddress(opengl_module, proc_name);
+            proc = (gl_proc)GetProcAddress(opengl_module, proc_name);
     }
 
     return proc;
