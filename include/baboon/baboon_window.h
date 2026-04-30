@@ -1,7 +1,6 @@
 #ifndef __BABOON_WINDOW_H__
 #define __BABOON_WINDOW_H__
 
-#include <stdbool.h>
 #include <windows.h>
 #include <wingdi.h>
 #include <stdlib.h>
@@ -12,6 +11,9 @@ extern "C"
 #endif
 
 #define BABOON_NONE				-1
+
+#define BABOON_FALSE			0
+#define BABOON_TRUE				1
 
 #define BABOON_RELEASE			0
 #define BABOON_PRESS			1
@@ -29,10 +31,12 @@ extern "C"
 #define BABOON_MB_RIGHT			BABOON_MB_2
 #define BABOON_MB_MIDDLE		BABOON_MB_3
 
-#define BABOON_CURSOR_NORMAL	0
-#define BABOON_CURSOR_HIDDEN	1
-#define BABOON_CURSOR_DISABLED	2
-#define BABOON_CURSOR_CAPTURED	3
+#define BABOON_CURSOR			0x00010001
+
+#define BABOON_CURSOR_NORMAL	0x00011001
+#define BABOON_CURSOR_HIDDEN	0x00011002
+#define BABOON_CURSOR_DISABLED	0x00011003
+#define BABOON_CURSOR_CAPTURED	0x00011004
 
 #define BABOON_MOD_CONTROL		0x0001
 #define BABOON_MOD_SHIFT		0x0002
@@ -45,10 +49,12 @@ extern "C"
 
 typedef struct BaboonWindow BaboonWindow;
 
+typedef int BaboonBool;
+
 typedef void (*baboon_resize_callback)(BaboonWindow *window, int x_size, int y_size);
 typedef void (*baboon_mb_callback)(BaboonWindow *window, int button, int action, int mods);
 typedef void (*baboon_mouse_pos_callback)(BaboonWindow *window, double x_pos, double y_pos);
-typedef void (*baboon_mouse_enter_callback)(BaboonWindow *window, bool entered);
+typedef void (*baboon_mouse_enter_callback)(BaboonWindow *window, BaboonBool entered);
 
 typedef void (*gl_proc)(void);
 
@@ -61,6 +67,11 @@ void set_mouse_click_callback(BaboonWindow *window, baboon_mb_callback callback)
 void set_mouse_pos_callback(BaboonWindow *window, baboon_mouse_pos_callback callback);
 void set_mouse_enter_callback(BaboonWindow *window, baboon_mouse_enter_callback callback);
 
+void set_input_mode(BaboonWindow *window, int mode, int value);
+
+void set_cursor_pos(BaboonWindow *window, double x_pos, double y_pos);
+void center_cursor(BaboonWindow *window);
+
 void get_window_size(BaboonWindow *window, int *width, int *height);
 int get_mouse_button(BaboonWindow *window, int button);
 void get_cursor_pos(BaboonWindow *window, double *x_pos, double *y_pos);
@@ -68,8 +79,8 @@ void get_cursor_pos(BaboonWindow *window, double *x_pos, double *y_pos);
 void make_context_current(BaboonWindow* window);
 void poll_events(void);
 void wait_events(void);
-bool window_should_close(BaboonWindow *window);
-void set_window_should_close(BaboonWindow* window, bool should_close);
+BaboonBool window_should_close(BaboonWindow *window);
+void set_window_should_close(BaboonWindow *window, BaboonBool should_close);
 void swap_buffers(BaboonWindow *window);
 gl_proc baboon_get_proc_address(const char* proc_name);
 

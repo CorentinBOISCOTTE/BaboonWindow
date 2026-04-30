@@ -22,7 +22,7 @@ endif()
 #---------------------------------------#
 #			SOURCES					    #
 #---------------------------------------#
-#file(GLOB_RECURSE BaboonWindow_SOURCES "src/baboon/*.c")
+list(APPEND BaboonWindow_SOURCES "src/baboon_internal.c")
 
 # Platform-specific sources
 if(WIN32)

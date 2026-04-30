@@ -21,7 +21,7 @@ static void mouse_pos_callback(BaboonWindow *window, double x_pos, double y_pos)
     printf("(Callback) Mouse pos: x = %f, y = %f\n", x_pos, y_pos);
 }
 
-static void mouse_enter_callback(BaboonWindow *window, bool entered)
+static void mouse_enter_callback(BaboonWindow *window, BaboonBool entered)
 {
     (void)window;
     if (entered)
@@ -68,14 +68,12 @@ int main(void)
         renderer_present(renderer, window);
 
         if (get_mouse_button(window, BABOON_MB_MIDDLE) == BABOON_RELEASE)
-            set_window_should_close(window, true);
+            set_window_should_close(window, BABOON_TRUE);
 
         if (get_mouse_button(window, BABOON_MB_RIGHT) == BABOON_PRESS)
-        {
-            double x, y;
-            get_cursor_pos(window, &x, &y);
-            printf("Mouse pos: x = %f, y = %f\n", x, y);
-        }
+            set_input_mode(window, BABOON_CURSOR, BABOON_CURSOR_CAPTURED);
+        else if (get_mouse_button(window, BABOON_MB_RIGHT) == BABOON_RELEASE)
+            set_input_mode(window, BABOON_CURSOR, BABOON_CURSOR_NORMAL);
     }
 
     destroy_renderer(renderer);
